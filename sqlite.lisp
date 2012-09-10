@@ -63,5 +63,3 @@
 
 (add-sql-op :vacuum)
 
-(defmacro with-transaction ((db) &body body)
-  ())
