@@ -21,17 +21,9 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (pushnew ,op *sql-ops*)))
 
-#+nil(defun add-sql-op (op)
-  "Adds a keyword to the list of known SQL operators."
-  (pushnew op *sql-ops*))
-
 (defmacro undefine-sql-op (op)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (setf *sql-ops* (remove ,op *sql-ops*))))
-
-#+nil(defun remove-sql-op (op)
-  "Removes a keyword from the list of known SQL operators."
-  (setf *sql-ops* (remove op *sql-ops*)))
 
 ;;; Special Ops
 
