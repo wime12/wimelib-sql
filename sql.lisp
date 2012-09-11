@@ -116,13 +116,13 @@
     (raw-string processor "'"))
   (:method (processor (number number))
     (escape-sql processor number))
-  (:method (processor (keyword keyword))
-    (raw-string processor (string-upcase (symbol-name keyword))))
   (:method (processor (symbol symbol))
-    (intersperse processor "." (mapcar #'make-symbol
+    (if (keywordp symbol)
+	(raw-string processor (string-upcase (symbol-name symbol)))
+	(intersperse processor "." (mapcar #'make-symbol
 				       (split #\. (symbol-name symbol)))
 		 :key (lambda (processor part)
-			(quote-identifier processor part)))))
+			(quote-identifier processor part))))))
 
 ;;; The SQL parser
 
