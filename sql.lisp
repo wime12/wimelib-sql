@@ -12,74 +12,74 @@
 
 ;;; SQL Ops
 
-(defvar *sql-ops* nil)
+(defvar *sql-ops* '())
 
 (defun sql-op-p (op)
   (member op *sql-ops*))
 
-(defun add-sql-op (op)
+(defmacro define-sql-op (op)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (pushnew ,op *sql-ops*)))
+
+#+nil(defun add-sql-op (op)
   "Adds a keyword to the list of known SQL operators."
   (pushnew op *sql-ops*))
 
-(defun remove-sql-op (op)
+(defmacro undefine-sql-op (op)
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (setf *sql-ops* (remove ,op *sql-ops*))))
+
+#+nil(defun remove-sql-op (op)
   "Removes a keyword from the list of known SQL operators."
   (setf *sql-ops* (remove op *sql-ops*)))
 
 ;;; Special Ops
 
-(defvar *special-ops* nil)
+(defvar *special-ops* '(:dot :cols :list :coldef :embed))
 
 (defun special-op-p (op)
   (member op *special-ops*))
 
-(defun add-special-op (op)
-  (pushnew op *special-ops*))
-
-(defun remove-special-op (op)
-  (setf *special-ops* (remove op *special-ops*)))
-
 (defun process-special-op (processor sexp)
   (proc-special-op processor (car sexp) (cdr sexp)))
 
-(defgeneric proc-special-op (processor special-op args))
+(defgeneric proc-special-op (processor special-op args)
+  (:method (processor (special-op (eql :dot)) args)
+    (intersperse processor "." args))
+  (:method (processor (special-op (eql :cols)) args)
+    (intersperse processor ", " args))
+  (:method (processor (special-op (eql :list)) args)
+    (raw-string processor "(")
+    (intersperse processor ", " args)
+    (raw-string processor ")"))
+  (:method (processor (special-op (eql :coldef)) args)
+    (raw-string processor "(")
+    (intersperse processor ", " args
+	       :key (lambda (processor args)
+		      (intersperse processor " " args)))
+    (raw-string processor ")")))
 
-(defun undefine-special-op (op)
+(defmacro undefine-special-op (op)
   "Undefines a special op."
-  (handler-case
-      (progn
-	(remove-special-op op)
-	(remove-method #'proc-special-op
-		       (find-method #'proc-special-op '()
-				    (list t `(eql ,op) t)))
-	t)
-    (simple-error (se)
-      (declare (ignore se))
-      nil)))
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (handler-case
+	 (progn
+	   (setf *special-ops* (remove ,op *special-ops*))
+	   (remove-method #'proc-special-op
+			  (find-method #'proc-special-op '()
+				       (list t `(eql ,',op) t)))
+	   t)
+       (simple-error (se)
+	 (declare (ignore se))
+	 nil))))
 
 (defmacro define-special-op (op (processor args) &body body)
   "Defines a special op, a kind of SQL macro."
   `(progn
      (defmethod proc-special-op (,processor (special-op (eql ,op)) ,args)
        ,@body)
-     (add-special-op ,op)))
-
-(define-special-op :dot (processor args)
-  (intersperse processor "." args))
-
-(define-special-op :cols (processor args)
-  (intersperse processor ", " args))
-
-(define-special-op :list (processor args)
-  (raw-string processor "(")
-  (intersperse processor ", " args)
-  (raw-string processor ")"))
-
-(define-special-op :col-def (processor args)
-  (raw-string processor "(")
-  (intersperse processor ", " args
-	       :key (lambda (processor args)
-		      (intersperse processor " " args)))
-  (raw-string processor ")"))
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       (pushnew ,op *special-ops*))))
 
 ;;; Interpreter
 
@@ -133,9 +133,8 @@
 	((sql-op-p (car sexp)) (process-sql-op processor sexp))
 	((keywordp (car sexp)) (process-sql-function processor sexp))
 	((and (consp sexp) (consp (car sexp)))
-	 (process-sql processor (cons :col-def sexp)))
-	((consp sexp) (process-sql processor (cons :list sexp)))
-	(t (error "SQL: Syntax error"))))
+	 (process-sql processor (cons :coldef sexp)))
+	((consp sexp) (process-sql processor (cons :list sexp)))))
 
 (defvar *sql-identifier-quote* "\"")
 
@@ -182,7 +181,8 @@ the list WORDS are separated by separator."
 (defmethod raw-string ((sql-compiler sql-compiler) string)
   (push-op `(:raw-string ,string) (sql-compiler-ops sql-compiler)))
 
-(define-special-op :embed ((processor sql-compiler) args)
+(defmethod proc-special-op ((processor sql-compiler) (special-op (eql :embed))
+			    args)
   (embed-value processor (car args)))
 
 (defgeneric embed-value (sql-compiler value)
