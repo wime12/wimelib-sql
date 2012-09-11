@@ -6,6 +6,5 @@
   :author "Wilfried Meindl <wilfried.meindl@gmail.com>"
   :license "BSD"
   :components ((:file "package")
-               (:file "sql")
-	       (:file "sqlite")))
+               (:file "sql")))
 
