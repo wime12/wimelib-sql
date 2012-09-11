@@ -62,4 +62,3 @@
 (add-sql-op :update)
 
 (add-sql-op :vacuum)
-
