@@ -218,7 +218,7 @@ the list WORDS are separated by separator."
 (defmacro sql (sexp)
   (generate-code (optimize-op-array (sexp->ops sexp))))
 
-;;; Reader for [] syntax
+;;; Reader syntax
 
 (defun enable-column-reader-syntax ()
   (set-macro-character #\[
