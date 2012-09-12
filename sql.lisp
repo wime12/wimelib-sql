@@ -27,7 +27,7 @@
 
 ;;; Special Ops
 
-(defvar *special-ops* '(:dot :cols :list :coldef :embed))
+(defvar *special-ops* '(:dot :columns :list :with-columns :embed))
 
 (defun special-op-p (op)
   (member op *special-ops*))
@@ -38,13 +38,13 @@
 (defgeneric proc-special-op (processor special-op args)
   (:method (processor (special-op (eql :dot)) args)
     (intersperse processor "." args))
-  (:method (processor (special-op (eql :cols)) args)
+  (:method (processor (special-op (eql :columns)) args)
     (intersperse processor ", " args))
   (:method (processor (special-op (eql :list)) args)
     (raw-string processor "(")
     (intersperse processor ", " args)
     (raw-string processor ")"))
-  (:method (processor (special-op (eql :coldef)) args)
+  (:method (processor (special-op (eql :with-columns)) args)
     (raw-string processor "(")
     (intersperse processor ", " args
 	       :key (lambda (processor args)
@@ -124,8 +124,6 @@
 	((special-op-p (car sexp)) (process-special-op processor sexp))
 	((sql-op-p (car sexp)) (process-sql-op processor sexp))
 	((keywordp (car sexp)) (process-sql-function processor sexp))
-	((and (consp sexp) (consp (car sexp)))
-	 (process-sql processor (cons :coldef sexp)))
 	((consp sexp) (process-sql processor (cons :list sexp)))))
 
 (defvar *sql-identifier-quote* "\"")
@@ -224,7 +222,7 @@ the list WORDS are separated by separator."
   (set-macro-character #\[
     (lambda (stream char)
       (declare (ignorable char))
-      (cons :cols (read-delimited-list #\] stream t))))
+      (cons :columns (read-delimited-list #\] stream t))))
   (set-syntax-from-char #\] #\)))
 
 (defun disable-column-reader-syntax ()
