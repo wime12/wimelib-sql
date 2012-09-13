@@ -8,15 +8,14 @@
 	   #:define-special-op
 	   #:undefine-special-op
 	   #:raw-string
+	   #:process-sql
 	   #:process-literal
 	   #:sql-interpreter
 	   #:get-sql-interpreter
 	   #:*sql-interpreter*
-	   #:sql*
 	   #:sql-compiler
 	   #:get-sql-compiler
 	   #:*sql-compiler*
-	   #:sql
 	   #:intersperse
 	   #:enable-embed-reader-syntax
 	   #:disable-embed-reader-syntax

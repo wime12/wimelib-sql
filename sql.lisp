@@ -117,7 +117,7 @@
 (defun escape-identifier (string)
   (substitute #\_ #\- string))
 
-;;; The SQL parser
+;;; The SQL processer
 
 (defgeneric process-sql (processor sexp)
   (:documentation
@@ -158,27 +158,26 @@ the list WORDS are separated by separator."
 (defun get-sql-interpreter ()
   (or *sql-interpreter* (make-instance 'sql-interpreter)))
 
-(defun sql* (sexp)
-  "Writes an SQL statement built from SEXP to *SQL-OUTPUT*."
-  (process-sql (get-sql-interpreter) sexp)
-  nil)
-
 ;;; Compiler
+
+(defvar *sql-compiler* nil)
 
 (defclass sql-compiler (sql-processor)
   ((ops :accessor sql-compiler-ops
 	:initform (make-ops-buffer))))
-
-(defvar *sql-compiler* nil)
-
-(defun get-sql-compiler ()
-  (or *sql-compiler* (make-instance 'sql-compiler)))
 
 (defun make-ops-buffer ()
   (make-array 10 :adjustable t :fill-pointer 0))
 
 (defun push-op (op ops)
   (vector-push-extend op ops))
+
+(defun get-sql-compiler ()
+  (or *sql-compiler* (make-instance 'sql-compiler)))
+
+(defmethod process-sql ((processor sql-compiler) sexp)
+  (call-next-method processor sexp)
+  (generate-code (optimize-op-array (sql-compiler-ops processor))))
 
 (defmethod raw-string ((sql-compiler sql-compiler) string)
   (push-op `(:raw-string ,string) (sql-compiler-ops sql-compiler)))
@@ -231,9 +230,6 @@ the list WORDS are separated by separator."
     `(write-sequence ,arg *sql-output*))
   (:method ((op (eql :embed-value)) arg)
     `(process-sql *sql-interpreter* ,arg)))
-
-(defmacro sql (sexp)
-  (generate-code (optimize-op-array (sexp->ops sexp))))
 
 ;;; Reader syntax
 
