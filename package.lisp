@@ -3,6 +3,7 @@
 (defpackage #:wimelib-sql
   (:use #:cl)
   (:export #:*sql-output*
+	   #:*sql-identifier-quote*
 	   #:define-sql-op
 	   #:undefine-sql-op
 	   #:define-special-op
