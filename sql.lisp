@@ -134,7 +134,7 @@
   (raw-string processor ";"))
 
 (defun process-sql-function (processor sexp)
-  (escape-sql processor (car sexp))
+  (process-sql processor (car sexp))
   (raw-string processor "(")
   (intersperse processor ", " (cdr sexp))
   (raw-string processor ")"))
