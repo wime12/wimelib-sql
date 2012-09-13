@@ -9,7 +9,6 @@
 	   #:undefine-special-op
 	   #:raw-string
 	   #:process-literal
-	   #:escape-sql
 	   #:sql-interpreter
 	   #:get-sql-interpreter
 	   #:*sql-interpreter*
@@ -23,4 +22,3 @@
 	   #:disable-embed-reader-syntax
 	   #:enable-column-reader-syntax
 	   #:disable-column-reader-syntax))
-

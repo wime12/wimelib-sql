@@ -78,10 +78,11 @@
      (eval-when (:compile-toplevel :load-toplevel :execute)
        (pushnew ,op *special-ops*))))
 
-;;; Escape literal values
+;;; Process literal values
 
-(defgeneric escape-sql (processor obj)
+(defgeneric process-literal (processor literal)
   (:method ((processor sql-processor) (string string))
+    (raw-string processor "'")
     (raw-string processor
 		(with-output-to-string (buffer)
 		  (with-input-from-string (str string)
@@ -89,23 +90,12 @@
 			((not c))
 		      (case c
 			((#\') (write-sequence "''" buffer))
-			(t (write-char c buffer))))))))
+			(t (write-char c buffer)))))))
+    (raw-string processor "'"))
   (:method ((processor sql-processor) (number float))
     (raw-string processor (format nil "~,,,,,,'EE" number)))
   (:method ((processor sql-processor) (number integer))
     (raw-string processor (princ-to-string number)))
-  (:method ((processor sql-processor) (symbol symbol))
-    (raw-string processor (substitute #\_ #\- (symbol-name symbol)))))
-
-;;; Process literal values
-
-(defgeneric process-literal (processor literal)
-  (:method ((processor sql-processor) (string string))
-    (raw-string processor "'")
-    (escape-sql processor string)
-    (raw-string processor "'"))
-  (:method ((processor sql-processor) (number number))
-    (escape-sql processor number))
   (:method ((processor sql-processor) (symbol symbol))
     (if (keywordp symbol)
 	(raw-string processor (string-upcase (symbol-name symbol)))
@@ -113,6 +103,19 @@
 				       (split #\. (symbol-name symbol)))
 		 :key (lambda (processor part)
 			(quote-identifier processor part))))))
+
+(defvar *sql-identifier-quote* "\"")
+
+(defun quote-identifier (processor symbol)
+  "Surrounds STRING with double quotes."
+  (when *sql-identifier-quote*
+    (raw-string processor *sql-identifier-quote*))
+  (raw-string processor (escape-identifier (symbol-name symbol)))
+  (when *sql-identifier-quote*
+    (raw-string processor *sql-identifier-quote*)))
+
+(defun escape-identifier (string)
+  (substitute #\_ #\- string))
 
 ;;; The SQL parser
 
@@ -125,16 +128,6 @@
 	((sql-op-p (car sexp)) (process-sql-op processor sexp))
 	((keywordp (car sexp)) (process-sql-function processor sexp))
 	((consp sexp) (process-sql processor (cons :list sexp))))))
-
-(defvar *sql-identifier-quote* "\"")
-
-(defun quote-identifier (processor symbol)
-  "Surrounds STRING with double quotes."
-  (when *sql-identifier-quote*
-    (raw-string processor *sql-identifier-quote*))
-  (escape-sql processor symbol)
-  (when *sql-identifier-quote*
-    (raw-string processor *sql-identifier-quote*)))
 
 (defun process-sql-op (processor sexp)
   (intersperse processor " " sexp)
