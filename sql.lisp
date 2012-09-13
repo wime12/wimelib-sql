@@ -195,7 +195,7 @@ the list WORDS are separated by separator."
   (eq (car op) :embed-value))
 
 (defun sexp->ops (sexp)
-  (let ((compiler (make-instance 'sql-compiler)))
+  (let ((compiler (get-sql-compiler)))
     (process-sql compiler sexp)
     (sql-compiler-ops compiler)))
 
