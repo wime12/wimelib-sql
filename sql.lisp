@@ -13,18 +13,23 @@
   (member op *sql-ops*))
 
 (defmacro define-sql-op (op)
+  "An SQL op is just an object, usually a keyword like :SELECT,
+that starts an SQL statement."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (pushnew ,op *sql-ops*)))
 
 (defmacro undefine-sql-op (op)
+  "Makes an SQL op undefined"
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (setf *sql-ops* (remove ,op *sql-ops*))))
 
 ;;; SQL Processor
 
-(defclass sql-processor () ())
+(defclass sql-processor () ()
+  (:documentation "The base class for all SQL processors."))
 
 (defgeneric raw-string (processor string)
+  "Ultimately handles the string that is produced from SQL sexps."
   (:method ((processor sql-processor) string)
     (write-sequence string *sql-output*))
   (:documentation "Outputs a bare string on the SQL output."))
@@ -57,7 +62,7 @@
     (raw-string processor ")")))
 
 (defmacro undefine-special-op (op)
-  "Undefines a special op."
+  "Makes a special op undefined."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (handler-case
 	 (progn
@@ -71,7 +76,8 @@
 	 nil))))
 
 (defmacro define-special-op (op (processor args) &body body)
-  "Defines a special op, a kind of SQL macro."
+  "Special ops define the syntactical entities of SQL sexps.
+They take precedence over SQL ops."
   `(progn
      (defmethod proc-special-op (,processor (special-op (eql ,op)) ,args)
        ,@body)
@@ -81,6 +87,7 @@
 ;;; Process literal values
 
 (defgeneric process-literal (processor literal)
+  (:documentation "Transforms literal values (e.g. strings, numbers, keywords, symbols) to their corresponding SQL form.")
   (:method ((processor sql-processor) (string string))
     (raw-string processor "'")
     (raw-string processor
@@ -104,7 +111,9 @@
 		 :key (lambda (processor part)
 			(quote-identifier processor part))))))
 
-(defvar *sql-identifier-quote* "\"")
+(defvar *sql-identifier-quote* "\""
+  "The string that surrounds SQL identifiers. Set to NIL or the empty string
+if you do not want quoted identifiers.")
 
 (defun quote-identifier (processor symbol)
   "Surrounds STRING with double quotes."
@@ -120,8 +129,10 @@
 ;;; The SQL processer
 
 (defgeneric process-sql (processor sexp)
-  (:documentation
-   "Writes an SQL statement built from SEXP to STREAM using PROCESSOR.")
+  (:documentation "Transforms an SQL sexp. Called with the standard sql-interpreter
+it outputs a string representing the SQL statement on *SQL-OUTPUT*.
+Called with the standard sql-compiler it returns code which writes
+to *SQL-OUTPUT*.")
   (:method ((processor sql-processor) sexp)
     (cond ((atom sexp) (process-literal processor sexp))
 	((special-op-p (car sexp)) (process-special-op processor sexp))
@@ -140,8 +151,8 @@
   (raw-string processor ")"))
 
 (defun intersperse (processor separator words &key (key #'process-sql))
-  "Outputs a string on PROCESSOR in which the transformed elements of
-the list WORDS are separated by separator."
+  "Intersperses a separator between the results of calling KEY on the list
+members of WORDS. KEY takes a processor and an SQL sexp."
   (loop
      for s in words
      for rest on words
