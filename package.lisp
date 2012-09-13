@@ -10,7 +10,13 @@
 	   #:raw-string
 	   #:process-literal
 	   #:escape-sql
+	   #:sql-interpreter
+	   #:get-sql-interpreter
+	   #:*sql-interpreter*
 	   #:sql*
+	   #:sql-compiler
+	   #:get-sql-compiler
+	   #:*sql-compiler*
 	   #:sql
 	   #:intersperse
 	   #:enable-embed-reader-syntax
