@@ -6,8 +6,10 @@
 	   #:*sql-identifier-quote*
 	   #:define-sql-op
 	   #:undefine-sql-op
+	   #:sql-op-p
 	   #:define-special-op
 	   #:undefine-special-op
+	   #:special-op-p
 	   #:raw-string
 	   #:process-sql
 	   #:process-literal

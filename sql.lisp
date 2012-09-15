@@ -9,8 +9,8 @@
 
 (defvar *sql-ops* '())
 
-(defun sql-op-p (op)
-  (member op *sql-ops*))
+(defgeneric sql-op-p (processor op)
+  (:method-combination or))
 
 (defmacro define-sql-op (op)
   "An SQL op is just an object, usually a keyword like :SELECT,
@@ -29,16 +29,21 @@ that starts an SQL statement."
   (:documentation "The base class for all SQL processors."))
 
 (defgeneric raw-string (processor string)
-  "Ultimately handles the string that is produced from SQL sexps."
   (:method ((processor sql-processor) string)
     (write-sequence string *sql-output*))
-  (:documentation "Outputs a bare string on the SQL output."))
+  (:documentation "Ultimately handles the string that is produced from SQL sexps."))
+
+(defmethod sql-op-p or ((processor sql-processor) op)
+  (member op *sql-ops*))
 
 ;;; Special Ops
 
 (defvar *special-ops* '(:dot :columns :list :with-columns :embed))
 
-(defun special-op-p (op)
+(defgeneric special-op-p (processor op)
+  (:method-combination or))
+
+(defmethod special-op-p or ((processor sql-processor) op)
   (member op *special-ops*))
 
 (defgeneric process-special-op (processor sexp)
