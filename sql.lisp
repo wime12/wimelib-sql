@@ -161,6 +161,7 @@ members of WORDS. KEY takes a processor and an SQL sexp."
   (write-sequence string *sql-output*))
 
 (define-special-op :embed ((processor sql-interpreter-mixin) args)
+  (declare (ignorable args))
   (error "Cannot embed values in interpreted mode."))
 
 ;;; Compiler
@@ -180,7 +181,10 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (defgeneric compile-sql (processor sexp)
   (:method ((processor sql-compiler-mixin) sexp)
     (process-sql processor sexp)
-    (generate-code (optimize-op-array (sql-compiler-ops processor)))))
+    (setf (sql-compiler-ops processor)
+	  (optimize-op-array (sql-compiler-ops processor)))
+    (values (generate-code (sql-compiler-ops processor))
+	    (some #'embed-op-p (sql-compiler-ops processor)))))
 
 (defmethod raw-string ((sql-compiler sql-compiler-mixin) string)
   (push-op `(:raw-string ,string) (sql-compiler-ops sql-compiler)))
