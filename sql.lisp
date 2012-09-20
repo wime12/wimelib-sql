@@ -7,21 +7,17 @@
 
 ;;; SQL Ops
 
-(defvar *sql-ops* '())
-
 (defgeneric sql-op-p (processor op)
-  (:method-combination or))
+  (:method (processor op)
+    (declare (ignorable processor op))
+    nil))
 
-(defmacro define-sql-op (op)
+(defmacro define-sql-op (processor-class op)
   "An SQL op is just an object, usually a keyword like :SELECT,
 that starts an SQL statement."
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (pushnew ,op *sql-ops*)))
-
-(defmacro undefine-sql-op (op)
-  "Makes an SQL op undefined"
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (setf *sql-ops* (remove ,op *sql-ops*))))
+  `(defmethod sql-op-p ((processor ,processor-class) (op (eql ,op)))
+     (declare (ignorable op))
+     t))
 
 ;;; SQL Processor
 
@@ -29,65 +25,27 @@ that starts an SQL statement."
   (:documentation "The base class for all SQL processors."))
 
 (defgeneric raw-string (processor string)
-  (:method ((processor sql-processor) string)
-    (write-sequence string *sql-output*))
   (:documentation "Ultimately handles the string that is produced from SQL sexps."))
-
-(defmethod sql-op-p or ((processor sql-processor) op)
-  (member op *sql-ops*))
 
 ;;; Special Ops
 
-(defvar *special-ops* '(:dot :columns :list :with-columns :embed))
-
 (defgeneric special-op-p (processor op)
-  (:method-combination or))
-
-(defmethod special-op-p or ((processor sql-processor) op)
-  (member op *special-ops*))
+  (:method (processor op)
+    (declare (ignore processor op))
+    nil))
 
 (defgeneric process-special-op (processor sexp)
   (:method ((processor sql-processor) sexp)
     (proc-special-op processor (car sexp) (cdr sexp))))
 
-(defgeneric proc-special-op (processor special-op args)
-  (:method ((processor sql-processor) (special-op (eql :dot)) args)
-    (intersperse processor "." args))
-  (:method ((processor sql-processor) (special-op (eql :columns)) args)
-    (intersperse processor ", " args))
-  (:method ((processor sql-processor) (special-op (eql :list)) args)
-    (raw-string processor "(")
-    (intersperse processor ", " args)
-    (raw-string processor ")"))
-  (:method ((processor sql-processor) (special-op (eql :with-columns)) args)
-    (raw-string processor "(")
-    (intersperse processor ", " args
-	       :key (lambda (processor args)
-		      (intersperse processor " " args)))
-    (raw-string processor ")")))
+(defgeneric proc-special-op (processor special-op args))
 
-(defmacro undefine-special-op (op)
-  "Makes a special op undefined."
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (handler-case
-	 (progn
-	   (setf *special-ops* (remove ,op *special-ops*))
-	   (remove-method #'proc-special-op
-			  (find-method #'proc-special-op '()
-				       (list t `(eql ,',op) t)))
-	   t)
-       (simple-error (se)
-	 (declare (ignore se))
-	 nil))))
-
-(defmacro define-special-op (op (processor args) &body body)
-  "Special ops define the syntactical entities of SQL sexps.
-They take precedence over SQL ops."
+(defmacro define-special-op (op ((processor processor-class) args) &body body)
   `(progn
-     (defmethod proc-special-op (,processor (special-op (eql ,op)) ,args)
-       ,@body)
-     (eval-when (:compile-toplevel :load-toplevel :execute)
-       (pushnew ,op *special-ops*))))
+     (defmethod special-op-p ((,processor ,processor-class) (op (eql ,op)))
+       t)
+     (defmethod proc-special-op ((,processor ,processor-class) (op (eql ,op)) ,args)
+       ,@body)))
 
 ;;; Process literal values
 
@@ -131,7 +89,7 @@ if you do not want quoted identifiers.")
 (defun escape-identifier (string)
   (substitute #\_ #\- string))
 
-;;; The SQL processer
+;;; The SQL processor
 
 (defgeneric process-sql (processor sexp)
   (:documentation "Transforms an SQL sexp. Called with the standard sql-interpreter
@@ -165,20 +123,51 @@ members of WORDS. KEY takes a processor and an SQL sexp."
      while (cdr rest)
      do (raw-string processor separator)))
 
-;;; Interpreter
+(define-special-op :dot ((processor sql-processor) args)
+  (intersperse processor "." args))
 
-(defclass sql-interpreter (sql-processor) ())
+(defun list-helper (processor args)
+  (intersperse processor ", " args
+	       :key (lambda (processor args)
+		      (if (and (symbolp (car args)) (not (keywordp (car args))))
+			  (intersperse processor " " args)
+			  (process-sql processor args)))))
+
+(define-special-op :columns ((processor sql-processor) args)
+  (cond ((consp (car args))
+	 (list-helper processor args))
+	(t (intersperse processor ", " args))))
+
+(define-special-op :list ((processor sql-processor) args)
+  (cond ((consp (car args))
+	 (raw-string processor "(")
+	 (list-helper processor args)
+	 (raw-string processor ")"))
+	(t (raw-string processor "(")
+	   (intersperse processor ", " args)
+	   (raw-string processor ")"))))
+
+;;; Interpreter
 
 (defvar *sql-interpreter* nil)
 
-(defun get-sql-interpreter ()
-  (or *sql-interpreter* (make-instance 'sql-interpreter)))
+(defclass sql-interpreter-mixin () ())
+
+(defgeneric interprete-sql (processor sexp)
+  (:method ((processor sql-interpreter-mixin) sexp)
+    (process-sql processor sexp)))
+
+(defmethod raw-string ((processor sql-interpreter-mixin) string)
+  (write-sequence string *sql-output*))
+
+(define-special-op :embed ((processor sql-interpreter-mixin) args)
+  (error "Cannot embed values in interpreted mode."))
 
 ;;; Compiler
 
 (defvar *sql-compiler* nil)
 
-(defclass sql-compiler (sql-processor)
+(defclass sql-compiler-mixin ()
   ((ops :accessor sql-compiler-ops
 	:initform (make-ops-buffer))))
 
@@ -188,31 +177,23 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (defun push-op (op ops)
   (vector-push-extend op ops))
 
-(defun get-sql-compiler ()
-  (or *sql-compiler* (make-instance 'sql-compiler)))
+(defgeneric compile-sql (processor sexp)
+  (:method ((processor sql-compiler-mixin) sexp)
+    (process-sql processor sexp)
+    (generate-code (optimize-op-array (sql-compiler-ops processor)))))
 
-(defmethod process-sql ((processor sql-compiler) sexp)
-  (call-next-method processor sexp)
-  (generate-code (optimize-op-array (sql-compiler-ops processor))))
-
-(defmethod raw-string ((sql-compiler sql-compiler) string)
+(defmethod raw-string ((sql-compiler sql-compiler-mixin) string)
   (push-op `(:raw-string ,string) (sql-compiler-ops sql-compiler)))
 
-(defmethod proc-special-op ((processor sql-compiler) (special-op (eql :embed))
-			    args)
+(define-special-op :embed ((processor sql-compiler-mixin) args)
   (embed-value processor (car args)))
 
 (defgeneric embed-value (sql-compiler value)
-  (:method ((sql-compiler sql-compiler) value)
+  (:method ((sql-compiler sql-compiler-mixin) value)
     (push-op `(:embed-value ,value) (sql-compiler-ops sql-compiler))))
 
 (defun embed-op-p (op)
   (eq (car op) :embed-value))
-
-(defun sexp->ops (sexp)
-  (let ((compiler (get-sql-compiler)))
-    (process-sql compiler sexp)
-    (sql-compiler-ops compiler)))
 
 (defun optimize-op-array (ops)
   (let ((new-ops (make-ops-buffer)))
@@ -231,21 +212,17 @@ members of WORDS. KEY takes a processor and an SQL sexp."
     new-ops))
 
 (defun generate-code (ops)
-  (let ((code `(progn
-		 ,@(loop
-		      for op across ops
-		      collect (process-op (first op) (second op)))
-		 nil)))
-    (if (some #'embed-op-p ops)
-	`(let ((*sql-interpreter* (get-sql-interpreter)))
-	   ,code)
-	code)))
+  `(progn
+     ,@(loop
+	  for op across ops
+	  collect (process-op (first op) (second op)))
+     nil))
 
 (defgeneric process-op (op arg)
   (:method ((op (eql :raw-string)) arg)
     `(write-sequence ,arg *sql-output*))
   (:method ((op (eql :embed-value)) arg)
-    `(process-sql *sql-interpreter* ,arg)))
+    `(interprete-sql *sql-interpreter* ,arg)))
 
 ;;; Reader syntax
 

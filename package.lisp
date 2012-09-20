@@ -5,19 +5,18 @@
   (:export #:*sql-output*
 	   #:*sql-identifier-quote*
 	   #:define-sql-op
-	   #:undefine-sql-op
 	   #:sql-op-p
 	   #:define-special-op
-	   #:undefine-special-op
 	   #:special-op-p
 	   #:raw-string
+	   #:sql-processor
 	   #:process-sql
 	   #:process-literal
-	   #:sql-interpreter
-	   #:get-sql-interpreter
+	   #:sql-interpreter-mixin
+	   #:interprete-sql
 	   #:*sql-interpreter*
-	   #:sql-compiler
-	   #:get-sql-compiler
+	   #:sql-compiler-mixin
+	   #:compile-sql
 	   #:*sql-compiler*
 	   #:intersperse
 	   #:enable-embed-reader-syntax

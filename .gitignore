@@ -2,3 +2,5 @@
 *.lisp~
 *.asd~
 *.db
+
+.DS_Store
