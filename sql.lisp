@@ -67,12 +67,13 @@ that starts an SQL statement."
   (:method ((processor sql-processor) (number integer))
     (raw-string processor (princ-to-string number)))
   (:method ((processor sql-processor) (symbol symbol))
-    (if (keywordp symbol)
-	(raw-string processor (string-upcase (symbol-name symbol)))
-	(intersperse processor "." (mapcar #'make-symbol
-				       (split #\. (symbol-name symbol)))
-		 :key (lambda (processor part)
-			(quote-identifier processor part))))))
+    (when symbol
+      (if (keywordp symbol)
+	  (raw-string processor (escape-identifier (symbol-name symbol)))
+	  (intersperse processor "." (mapcar #'make-symbol
+					     (split #\. (symbol-name symbol)))
+		       :key (lambda (processor part)
+			      (quote-identifier processor part)))))))
 
 (defvar *sql-identifier-quote* "\""
   "The string that surrounds SQL identifiers. Set to NIL or the empty string
@@ -104,8 +105,7 @@ to *SQL-OUTPUT*.")
 	  ((consp sexp) (process-sql processor (cons :list sexp))))))
 
 (defun process-sql-op (processor sexp)
-  (intersperse processor " " sexp)
-  (raw-string processor ";"))
+  (intersperse processor " " sexp))
 
 (defun process-sql-function (processor sexp)
   (process-sql processor (car sexp))
@@ -155,7 +155,8 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 
 (defgeneric interprete-sql (processor sexp)
   (:method ((processor sql-interpreter-mixin) sexp)
-    (process-sql processor sexp)))
+    (process-sql processor sexp)
+    (raw-string processor ";")))
 
 (defmethod raw-string ((processor sql-interpreter-mixin) string)
   (write-sequence string *sql-output*))
@@ -218,8 +219,9 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (defun generate-code (ops)
   `(progn
      ,@(loop
-	  for op across ops
-	  collect (process-op (first op) (second op)))
+	  :for op across ops
+	  :collect (process-op (first op) (second op)))
+     (write-sequence ";" *sql-output*)
      nil))
 
 (defgeneric process-op (op arg)
