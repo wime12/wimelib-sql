@@ -182,6 +182,7 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (defgeneric compile-sql (processor sexp)
   (:method ((processor sql-compiler-mixin) sexp)
     (process-sql processor sexp)
+    (push-op '(:raw-string ";") (sql-compiler-ops processor))
     (setf (sql-compiler-ops processor)
 	  (optimize-op-array (sql-compiler-ops processor)))
     (values (generate-code (sql-compiler-ops processor))
@@ -221,7 +222,6 @@ members of WORDS. KEY takes a processor and an SQL sexp."
      ,@(loop
 	  :for op across ops
 	  :collect (process-op (first op) (second op)))
-     (write-sequence ";" *sql-output*)
      nil))
 
 (defgeneric process-op (op arg)
