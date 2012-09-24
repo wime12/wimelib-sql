@@ -228,7 +228,7 @@ members of WORDS. KEY takes a processor and an SQL sexp."
   (:method ((op (eql :raw-string)) arg)
     `(write-sequence ,arg *sql-output*))
   (:method ((op (eql :embed-value)) arg)
-    `(interprete-sql *sql-interpreter* ,arg)))
+    `(process-sql *sql-interpreter* ,arg)))
 
 ;;; Reader syntax
 
