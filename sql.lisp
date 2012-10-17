@@ -12,7 +12,7 @@
     (declare (ignorable processor op))
     nil))
 
-(defmacro define-sql-op (processor-class op)
+(defmacro define-sql-op (op processor-class)
   "An SQL op is just an object, usually a keyword like :SELECT,
 that starts an SQL statement."
   `(defmethod sql-op-p ((processor ,processor-class) (op (eql ,op)))
@@ -133,7 +133,7 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 			  (intersperse processor " " args)
 			  (process-sql processor args)))))
 
-(define-special-op :columns ((processor sql-processor) args)
+(define-special-op :row ((processor sql-processor) args)
   (cond ((consp (car args))
 	 (list-helper processor args))
 	(t (intersperse processor ", " args))))
@@ -230,13 +230,16 @@ members of WORDS. KEY takes a processor and an SQL sexp."
   (:method ((op (eql :embed-value)) arg)
     `(process-sql *sql-interpreter* ,arg)))
 
+(define-special-op :splice ((processor sql-processor) args)
+  (intersperse processor " " args))
+
 ;;; Reader syntax
 
 (defun enable-column-reader-syntax ()
   (set-macro-character #\[
     (lambda (stream char)
       (declare (ignorable char))
-      (cons :columns (read-delimited-list #\] stream t))))
+      (cons :row (read-delimited-list #\] stream t))))
   (set-syntax-from-char #\] #\)))
 
 (defun disable-column-reader-syntax ()
