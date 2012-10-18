@@ -126,26 +126,21 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (define-special-op :dot ((processor sql-processor) args)
   (intersperse processor "." args))
 
-(defun list-helper (processor args)
-  (intersperse processor ", " args
-	       :key (lambda (processor args)
-		      (if (and (symbolp (car args)) (not (keywordp (car args))))
-			  (intersperse processor " " args)
-			  (process-sql processor args)))))
+(defun process-list-element (processor arg)
+  (if (and (listp arg) (symbolp (car arg)) (not (keywordp (car arg))))
+      (intersperse processor " " arg)
+      (process-sql processor arg)))
+
+(defun process-row (processor args)
+  (intersperse processor ", " args :key #'process-list-element))
 
 (define-special-op :row ((processor sql-processor) args)
-  (cond ((consp (car args))
-	 (list-helper processor args))
-	(t (intersperse processor ", " args))))
+  (process-row processor args))
 
 (define-special-op :list ((processor sql-processor) args)
-  (cond ((consp (car args))
-	 (raw-string processor "(")
-	 (list-helper processor args)
-	 (raw-string processor ")"))
-	(t (raw-string processor "(")
-	   (intersperse processor ", " args)
-	   (raw-string processor ")"))))
+  (raw-string processor "(")
+  (process-row processor args)
+  (raw-string processor ")"))
 
 ;;; Interpreter
 
@@ -233,7 +228,7 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 (define-special-op :splice ((processor sql-processor) args)
   (intersperse processor " " args))
 
-;;; Reader syntax
+;;; READER syntax
 
 (defun enable-column-reader-syntax ()
   (set-macro-character #\[
