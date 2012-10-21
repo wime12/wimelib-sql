@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:wimelib-sql
-  (:use #:cl)
+  (:use #:cl #:wimelib-utilities)
   (:export #:*sql-output*
 	   #:*sql-identifier-quote*
 	   #:define-sql-op

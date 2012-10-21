@@ -5,6 +5,7 @@
   :description "A simple processor for the SQL language."
   :author "Wilfried Meindl <wilfried.meindl@gmail.com>"
   :license "BSD"
+  :depends-on ("wimelib-utilities")
   :components ((:file "package")
                (:file "sql")))
 

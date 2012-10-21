@@ -116,12 +116,10 @@ to *SQL-OUTPUT*.")
 (defun intersperse (processor separator words &key (key #'process-sql))
   "Intersperses a separator between the results of calling KEY on the list
 members of WORDS. KEY takes a processor and an SQL sexp."
-  (loop
-     for s in words
-     for rest on words
-     do (funcall key processor s)
-     while (cdr rest)
-     do (raw-string processor separator)))
+  (mapl #'(lambda (words)
+	    (funcall key processor (car words))
+	    (when (cdr words) (raw-string processor separator)))
+	words))
 
 (define-special-op :dot ((processor sql-processor) args)
   (intersperse processor "." args))
@@ -203,20 +201,18 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 	       (let ((str (get-output-stream-string buf)))
 		 (when (not (string= str ""))
 		   (push-op `(:raw-string ,str) new-ops)))))
-	(loop
-	   for op across ops
-	   do (case (first op)
-		((:raw-string) (write-sequence (second op) buf))
-		(t (push-buf)
-		   (push-op op new-ops))))
+	(map nil (lambda (op)
+		   (case (car op)
+		     ((:raw-string) (write-sequence (second op) buf))
+		     (t (push-buf)
+			(push-op op new-ops))))
+	     ops)
 	(push-buf)))
     new-ops))
 
 (defun generate-code (ops)
   `(progn
-     ,@(loop
-	  :for op across ops
-	  :collect (process-op (first op) (second op)))
+     ,@(map 'list (lambda (op) (process-op (first op) (second op))) ops)
      nil))
 
 (defgeneric process-op (op arg)
@@ -249,21 +245,3 @@ members of WORDS. KEY takes a processor and an SQL sexp."
 
 (defun disable-embed-reader-syntax ()
   (set-macro-character #\@ nil))
-
-;; Auxiliary functions
-
-(defun split-at (separator sequence)
-  (let ((pos (position separator sequence)))
-    (if pos
-	(values
-	 (subseq sequence 0 pos)
-	 (subseq sequence (1+ pos)))
-	(values sequence nil))))
-
-(defun split (separator sequence)
-  (loop
-     with part
-     with rest = sequence
-     do (multiple-value-setq (part rest) (split-at separator rest))
-     collect part
-     while rest))
